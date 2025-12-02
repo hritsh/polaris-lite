@@ -148,7 +148,7 @@ export function Header({ hitlMode, onHitlChange }: HeaderProps) {
                             className="h-8 w-8"
                         >
                             <a
-                                href="https://github.com/yourusername/constellation"
+                                href="https://github.com/hritsh/polaris-lite"
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
