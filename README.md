@@ -4,12 +4,12 @@
 
 a multi-agent safety ai chatbot system for healthcare that uses multiple specialized auditors to verify and correct responses before they reach users. it uses a flask backend (making calls to the gemini api) and a next.js frontend.
 
+hosted and running on [vercel](https://polaris-lite.vercel.app/)
+
 <p align="center">
   <img src="./frontend/public/demo.gif" alt="demo" width="800"/>
   <br/>
 </p>
-
-hosted and running on [vercel](https://polaris-lite.vercel.app/)
 
 > [!NOTE]
 > initial load time may be slow as the backend wakes up from idling on render.com
@@ -64,13 +64,14 @@ actual future work could involve training specialized models for each agent, int
 ## screenshots
 
 1. chat interface with reasoning chain visible
-   <img width="1512" alt="chat view" src="https://github.com/user-attachments/assets/placeholder1.png" />
+    <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/3cdfedc9-3cfe-407b-b4d1-ba37f4cb36cf" />
 
+  
 2. safety correction in action - auditors flagging issues
-   <img width="1512" alt="safety correction" src="https://github.com/user-attachments/assets/placeholder2.png" />
+    <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/bdf787ab-0780-4fd3-b677-2a4c2219ea4f" />
 
 3. hitl mode - human approval with edit capability
-   <img width="1512" alt="hitl mode" src="https://github.com/user-attachments/assets/placeholder3.png" />
+    <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/5268620d-254c-47a0-9590-1604740651fb" />
 
 ## example prompts to try
 
