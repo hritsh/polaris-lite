@@ -266,15 +266,29 @@ AUDITOR_CONFIG = {
 
 
 def get_active_auditors(query: str, history: list = None) -> list:
-    """Determine which auditors should run based on the query and history."""
+    """Determine which auditors should run based on the query and history.
+
+    Returns auditors in stage order:
+    - Stage 1: medical (always first)
+    - Stage 2: pediatric, drug_interaction (parallel, conditional)
+    - Stage 3: legal, empathy (parallel, always)
+    """
     # combine query with recent history for keyword matching
     full_text = query.lower()
     if history:
         for msg in history[-4:]:  # last 4 messages
             full_text += " " + msg.get("content", "").lower()
 
+    # stage order for proper display
+    stage_order = ["medical", "pediatric",
+                   "drug_interaction", "legal", "empathy"]
+
     active = []
-    for auditor_id, config in AUDITOR_CONFIG.items():
+    for auditor_id in stage_order:
+        config = AUDITOR_CONFIG.get(auditor_id)
+        if not config:
+            continue
+
         if config["always_run"]:
             active.append(auditor_id)
         elif config["keywords"]:

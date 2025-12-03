@@ -29,17 +29,23 @@ hosted and running on [vercel](https://polaris-lite.vercel.app/)
 
 the system uses a "constellation" of specialized ai agents that work together:
 
-| Agent                           | Role                                                                                                    | When it runs                        |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| **Nurse Agent**                 | Drafts initial responses to health questions. Intentionally imperfect to demonstrate the safety system. | Always                              |
-| **Medical Auditor**            | Reviews drafts for medical accuracy, dangerous dosage info, missing disclaimers, urgency issues.        | Always                              |
-| **Legal Auditor**              | Reviews drafts for compliance issues, liability concerns, scope-of-practice violations.                 | Always                              |
-| **Empathy Auditor**            | Checks if the response is warm, reassuring, and appropriate for anxious patients.                       | Always                              |
-| **Pediatric Auditor**          | Specialized checks for child-specific safety (dosing, contraindications, age-appropriate care).         | When children/pregnancy mentioned   |
-| **Drug Interaction Auditor**   | Checks for dangerous drug interactions when multiple medications are discussed.                         | When multiple medications mentioned |
-| **Correction Agent**            | If auditors flag issues, this agent rewrites the response incorporating their feedback.                 | When any auditor flags an issue     |
+| Agent                        | Role                                                                                                    | When it runs                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| **Nurse Agent**              | Drafts initial responses to health questions. Intentionally imperfect to demonstrate the safety system. | Always                              |
+| **Medical Auditor**          | Reviews drafts for medical accuracy, dangerous dosage info, missing disclaimers, urgency issues.        | Always                              |
+| **Legal Auditor**            | Reviews drafts for compliance issues, liability concerns, scope-of-practice violations.                 | Always                              |
+| **Empathy Auditor**          | Checks if the response is warm, reassuring, and appropriate for anxious patients.                       | Always                              |
+| **Pediatric Auditor**        | Specialized checks for child-specific safety (dosing, contraindications, age-appropriate care).         | When children/pregnancy mentioned   |
+| **Drug Interaction Auditor** | Checks for dangerous drug interactions when multiple medications are discussed.                         | When multiple medications mentioned |
+| **Correction Agent**         | If auditors flag issues, this agent rewrites the response incorporating their feedback.                 | When any auditor flags an issue     |
 
-the auditors run **sequentially** (not in parallel) so you can watch each one process in real-time. conditional auditors are triggered by keyword detection in the user's message and conversation history.
+the auditors run in **staged parallel execution** using `asyncio.gather` for optimal performance:
+
+1. **Stage 1**: Medical Auditor (runs first - foundational safety check)
+2. **Stage 2**: Pediatric + Drug Interaction (run in parallel if triggered)
+3. **Stage 3**: Legal + Empathy (run in parallel - polish/compliance)
+
+conditional auditors are triggered by keyword detection in the user's message and conversation history.
 
 ## stuff used
 
@@ -93,7 +99,7 @@ actual future work could involve training specialized models for each agent, int
 2. safety correction in action - auditors flagging issues
    <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/d4af0f6b-367f-416a-a5c2-a97a2131f3e1" />
 
-4. hitl mode - human approval with edit capability
+3. hitl mode - human approval with edit capability
    <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/5268620d-254c-47a0-9590-1604740651fb" />
 
 ## example prompts to try
@@ -181,32 +187,41 @@ these prompts could be helpful to trigger different auditor combinations:
 │                        Backend                              │
 │  Flask + Gunicorn                                           │
 │  /chat/stream - SSE endpoint                                │
-│  Dynamic auditor selection based on keywords                │
+│  Dynamic auditor selection + staged parallel execution      │
 └─────────────────────────────────────────────────────────────┘
                               │
-            ┌─────────────────┼─────────────────┐
-            ▼                 │                 │
-    ┌───────────┐             │                 │
-    │   Nurse   │             │                 │
-    │   Agent   │─────────────┘                 │
-    │           │                               │
-    └───────────┘                               │
-            │                                   │
-            ▼ Sequential Auditing               │
-    ┌─────────────────────────────────────┐     │
-    │  Always Run:                        │     │
-    │  Medical → Legal → Empathy          │     │
-    ├─────────────────────────────────────┤     │
-    │  Conditional:                       │     │
-    │  - Pediatric (if child mentioned)   │     │
-    │  - Drug (if meds mentioned)         │     │
-    └─────────────────────────────────────┘     │
-                        │                       │
-                        ▼                       │
-                ┌───────────────────────────┐   │
-                │    Correction Agent       │   │
-                │  (if issues flagged)      │───┘
-                └───────────────────────────┘
+                              ▼
+                      ┌───────────┐
+                      │   Nurse   │
+                      │   Agent   │
+                      └─────┬─────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   │                   │
+   ┌─────────┐              │                   │
+   │ Stage 1 │              │                   │
+   │   Med   │ (sequential) │                   │
+   └────┬────┘              │                   │
+        │                   │                   │
+        ▼                   │                   │
+   ┌─────────────────┐      │                   │
+   │     Stage 2     │      │                   │
+   │    Ped ║  Drug  │ (parallel via asyncio.gather)
+   │  (if triggered) │      │                   │
+   └────────┬────────┘      │                   │
+            │               │                   │
+            ▼               │                   │
+   ┌─────────────────┐      │                   │
+   │     Stage 3     │      │                   │
+   │  Legal ║   Emp  │ (parallel via asyncio.gather)
+   └────────┬────────┘      │                   │
+            │               │                   │
+            ▼               │                   │
+    ┌───────────────────────┴───────────────────┐
+    │         Correction Agent                  │
+    │       (if any issues flagged)             │
+    └───────────────────────────────────────────┘
                             │
                             ▼
                       Gemini API

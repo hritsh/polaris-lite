@@ -81,20 +81,58 @@ def chat_stream():
             # send the list of active auditors to frontend
             yield f"data: {json.dumps({'step': 'auditing', 'status': 'started', 'active_auditors': active_auditors})}\n\n"
 
-            # run each auditor sequentially (not in parallel) so we can show progress
-            audit_results = {}
-            for auditor_id in active_auditors:
-                # send start event for this auditor
-                yield f"data: {json.dumps({'step': f'{auditor_id}_check', 'status': 'started', 'auditor_id': auditor_id})}\n\n"
+            # organize auditors into stages for smart parallel execution:
+            # Stage 1: Medical (always first - foundational safety)
+            # Stage 2: Pediatric + Drug Interaction (parallel - specialized checks)
+            # Stage 3: Legal + Empathy (parallel - polish/compliance)
 
-                # run the auditor
+            stage1 = [a for a in active_auditors if a == "medical"]
+            stage2 = [a for a in active_auditors if a in [
+                "pediatric", "drug_interaction"]]
+            stage3 = [a for a in active_auditors if a in ["legal", "empathy"]]
+
+            audit_results = {}
+
+            # Stage 1: Medical audit first
+            for auditor_id in stage1:
+                yield f"data: {json.dumps({'step': f'{auditor_id}_check', 'status': 'started', 'auditor_id': auditor_id})}\n\n"
                 result = loop.run_until_complete(
                     run_auditor(auditor_id, draft, query))
                 audit_results[auditor_id] = result
-
-                # send complete event with result
                 is_safe = result.get("status") == "SAFE"
                 yield f"data: {json.dumps({'step': f'{auditor_id}_check', 'status': 'complete', 'auditor_id': auditor_id, 'result': result, 'safe': is_safe})}\n\n"
+
+            # Stage 2: Pediatric + Drug Interaction in parallel
+            if stage2:
+                # mark all as started
+                for auditor_id in stage2:
+                    yield f"data: {json.dumps({'step': f'{auditor_id}_check', 'status': 'started', 'auditor_id': auditor_id})}\n\n"
+
+                # run in parallel using asyncio.gather
+                tasks = [run_auditor(a, draft, query) for a in stage2]
+                results = loop.run_until_complete(asyncio.gather(*tasks))
+
+                # send results
+                for auditor_id, result in zip(stage2, results):
+                    audit_results[auditor_id] = result
+                    is_safe = result.get("status") == "SAFE"
+                    yield f"data: {json.dumps({'step': f'{auditor_id}_check', 'status': 'complete', 'auditor_id': auditor_id, 'result': result, 'safe': is_safe})}\n\n"
+
+            # Stage 3: Legal + Empathy in parallel
+            if stage3:
+                # mark all as started
+                for auditor_id in stage3:
+                    yield f"data: {json.dumps({'step': f'{auditor_id}_check', 'status': 'started', 'auditor_id': auditor_id})}\n\n"
+
+                # run in parallel using asyncio.gather
+                tasks = [run_auditor(a, draft, query) for a in stage3]
+                results = loop.run_until_complete(asyncio.gather(*tasks))
+
+                # send results
+                for auditor_id, result in zip(stage3, results):
+                    audit_results[auditor_id] = result
+                    is_safe = result.get("status") == "SAFE"
+                    yield f"data: {json.dumps({'step': f'{auditor_id}_check', 'status': 'complete', 'auditor_id': auditor_id, 'result': result, 'safe': is_safe})}\n\n"
 
             # step 3: determine if correction needed
             # correct if any auditor is unsafe OR if there are suggestions to incorporate
@@ -145,7 +183,7 @@ async def run_constellation(query: str, history: list = None) -> dict:
     """
     the main constellation flow (non-streaming):
     1. nurse drafts response
-    2. auditors check sequentially
+    2. auditors check in staged parallel execution
     3. if issues found, nurse fixes it
     """
     if history is None:
@@ -157,11 +195,30 @@ async def run_constellation(query: str, history: list = None) -> dict:
     # step 2: determine which auditors to run
     active_auditors = get_active_auditors(query, history)
 
-    # run auditors sequentially
+    # organize auditors into stages for smart parallel execution
+    stage1 = [a for a in active_auditors if a == "medical"]
+    stage2 = [a for a in active_auditors if a in [
+        "pediatric", "drug_interaction"]]
+    stage3 = [a for a in active_auditors if a in ["legal", "empathy"]]
+
     audit_results = {}
-    for auditor_id in active_auditors:
+
+    # Stage 1: Medical first
+    for auditor_id in stage1:
         result = await run_auditor(auditor_id, draft, query)
         audit_results[auditor_id] = result
+
+    # Stage 2: Pediatric + Drug Interaction in parallel
+    if stage2:
+        results = await asyncio.gather(*[run_auditor(a, draft, query) for a in stage2])
+        for auditor_id, result in zip(stage2, results):
+            audit_results[auditor_id] = result
+
+    # Stage 3: Legal + Empathy in parallel
+    if stage3:
+        results = await asyncio.gather(*[run_auditor(a, draft, query) for a in stage3])
+        for auditor_id, result in zip(stage3, results):
+            audit_results[auditor_id] = result
 
     # check if we need corrections
     all_safe = all(r.get("status") == "SAFE" for r in audit_results.values())
