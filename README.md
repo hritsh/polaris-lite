@@ -32,11 +32,11 @@ the system uses a "constellation" of specialized ai agents that work together:
 | Agent                           | Role                                                                                                    | When it runs                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | **Nurse Agent**                 | Drafts initial responses to health questions. Intentionally imperfect to demonstrate the safety system. | Always                              |
-| **Medical Auditor** 🏥          | Reviews drafts for medical accuracy, dangerous dosage info, missing disclaimers, urgency issues.        | Always                              |
-| **Legal Auditor** ⚖️            | Reviews drafts for compliance issues, liability concerns, scope-of-practice violations.                 | Always                              |
-| **Empathy Auditor** 💜          | Checks if the response is warm, reassuring, and appropriate for anxious patients.                       | Always                              |
-| **Pediatric Auditor** 👶        | Specialized checks for child-specific safety (dosing, contraindications, age-appropriate care).         | When children/pregnancy mentioned   |
-| **Drug Interaction Auditor** 💊 | Checks for dangerous drug interactions when multiple medications are discussed.                         | When multiple medications mentioned |
+| **Medical Auditor**            | Reviews drafts for medical accuracy, dangerous dosage info, missing disclaimers, urgency issues.        | Always                              |
+| **Legal Auditor**              | Reviews drafts for compliance issues, liability concerns, scope-of-practice violations.                 | Always                              |
+| **Empathy Auditor**            | Checks if the response is warm, reassuring, and appropriate for anxious patients.                       | Always                              |
+| **Pediatric Auditor**          | Specialized checks for child-specific safety (dosing, contraindications, age-appropriate care).         | When children/pregnancy mentioned   |
+| **Drug Interaction Auditor**   | Checks for dangerous drug interactions when multiple medications are discussed.                         | When multiple medications mentioned |
 | **Correction Agent**            | If auditors flag issues, this agent rewrites the response incorporating their feedback.                 | When any auditor flags an issue     |
 
 the auditors run **sequentially** (not in parallel) so you can watch each one process in real-time. conditional auditors are triggered by keyword detection in the user's message and conversation history.
@@ -88,12 +88,12 @@ actual future work could involve training specialized models for each agent, int
 ## screenshots
 
 1. chat interface with reasoning chain visible
-   <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/3cdfedc9-3cfe-407b-b4d1-ba37f4cb36cf" />
+   <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/a74e6d8f-281e-4662-acbb-33dedb6f06be" />
 
 2. safety correction in action - auditors flagging issues
-   <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/bdf787ab-0780-4fd3-b677-2a4c2219ea4f" />
+   <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/d4af0f6b-367f-416a-a5c2-a97a2131f3e1" />
 
-3. hitl mode - human approval with edit capability
+4. hitl mode - human approval with edit capability
    <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/5268620d-254c-47a0-9590-1604740651fb" />
 
 ## example prompts to try
@@ -195,11 +195,11 @@ these prompts could be helpful to trigger different auditor combinations:
             ▼ Sequential Auditing               │
     ┌─────────────────────────────────────┐     │
     │  Always Run:                        │     │
-    │  🏥 Medical → ⚖️ Legal → 💜 Empathy  │     │
+    │  Medical → Legal → Empathy          │     │
     ├─────────────────────────────────────┤     │
     │  Conditional:                       │     │
-    │  👶 Pediatric (if child mentioned)  │     │
-    │  💊 Drug (if meds mentioned)        │     │
+    │  - Pediatric (if child mentioned)   │     │
+    │  - Drug (if meds mentioned)         │     │
     └─────────────────────────────────────┘     │
                         │                       │
                         ▼                       │
