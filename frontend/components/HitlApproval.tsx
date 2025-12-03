@@ -1,10 +1,10 @@
 "use client";
 
-import { ConstellationResponse } from "@/lib/types";
+import { ConstellationResponse, AUDITOR_UI_INFO } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DiffView } from "./DiffView";
-import { AlertTriangle, Check, X, Stethoscope, Scale, Edit2 } from "lucide-react";
+import { AlertTriangle, Check, X, Stethoscope, Scale, Edit2, Heart, Baby, Pill } from "lucide-react";
 import { useState } from "react";
 
 interface HitlApprovalProps {
@@ -13,8 +13,17 @@ interface HitlApprovalProps {
     onReject: () => void;
 }
 
+// map icon names to components
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+    Stethoscope,
+    Scale,
+    Heart,
+    Baby,
+    Pill,
+};
+
 export function HitlApproval({ response, onApprove, onReject }: HitlApprovalProps) {
-    const { medical_audit, legal_audit } = response;
+    const { audits, active_auditors } = response;
     const [isEditing, setIsEditing] = useState(false);
     const [editedText, setEditedText] = useState(response.final_response);
 
@@ -25,6 +34,11 @@ export function HitlApproval({ response, onApprove, onReject }: HitlApprovalProp
             onApprove();
         }
     };
+
+    // get auditors that flagged issues
+    const flaggedAuditors = (active_auditors || []).filter(
+        (id) => audits?.[id] && !audits[id].safe
+    );
 
     return (
         <Card className="p-4 border-amber-500/50 bg-amber-500/5">
@@ -37,32 +51,37 @@ export function HitlApproval({ response, onApprove, onReject }: HitlApprovalProp
                 The safety auditors flagged issues. Review the corrections and decide whether to apply them.
             </p>
 
-            {/* Show what was flagged */}
+            {/* Show what was flagged - dynamic auditors */}
             <div className="space-y-2 mb-4">
-                {!medical_audit.safe && (
-                    <div className="flex items-start gap-2 p-2 rounded bg-rose-500/10 border border-rose-500/20">
-                        <Stethoscope className="h-4 w-4 mt-0.5 text-rose-400 shrink-0" />
-                        <div className="text-sm">
-                            <span className="font-medium text-rose-400">Medical Issue: </span>
-                            <span className="text-muted-foreground">{medical_audit.reasoning}</span>
-                            {medical_audit.suggestion && (
-                                <p className="text-xs text-rose-400 mt-1">→ {medical_audit.suggestion}</p>
+                {flaggedAuditors.map((auditorId) => {
+                    const audit = audits?.[auditorId];
+                    const auditorInfo = AUDITOR_UI_INFO[auditorId];
+                    const IconComponent = auditorInfo ? iconMap[auditorInfo.icon] : Stethoscope;
+
+                    if (!audit) return null;
+
+                    return (
+                        <div
+                            key={auditorId}
+                            className={`flex items-start gap-2 p-2 rounded bg-rose-500/10 border border-rose-500/20`}
+                        >
+                            {IconComponent && (
+                                <IconComponent className={`h-4 w-4 mt-0.5 shrink-0 ${auditorInfo?.color || "text-rose-400"}`} />
                             )}
+                            <div className="text-sm">
+                                <span className={`font-medium ${auditorInfo?.color || "text-rose-400"}`}>
+                                    {audit.name || auditorInfo?.name || auditorId}:{" "}
+                                </span>
+                                <span className="text-muted-foreground">{audit.reasoning}</span>
+                                {audit.suggestion && (
+                                    <p className={`text-xs mt-1 ${auditorInfo?.color || "text-rose-400"}`}>
+                                        → {audit.suggestion}
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
-                {!legal_audit.safe && (
-                    <div className="flex items-start gap-2 p-2 rounded bg-purple-500/10 border border-purple-500/20">
-                        <Scale className="h-4 w-4 mt-0.5 text-purple-400 shrink-0" />
-                        <div className="text-sm">
-                            <span className="font-medium text-purple-400">Compliance Issue: </span>
-                            <span className="text-muted-foreground">{legal_audit.reasoning}</span>
-                            {legal_audit.suggestion && (
-                                <p className="text-xs text-purple-400 mt-1">→ {legal_audit.suggestion}</p>
-                            )}
-                        </div>
-                    </div>
-                )}
+                    );
+                })}
             </div>
 
             {/* Diff or Edit mode */}

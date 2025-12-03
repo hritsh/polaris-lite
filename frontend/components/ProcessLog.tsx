@@ -1,7 +1,7 @@
 "use client";
 
-import { ProcessState } from "@/lib/types";
-import { Check, Loader2, AlertTriangle, Stethoscope, Scale, Sparkles, Bot, X, CheckCircle2 } from "lucide-react";
+import { ProcessState, AUDITOR_UI_INFO } from "@/lib/types";
+import { Check, Loader2, AlertTriangle, Stethoscope, Scale, Sparkles, Bot, X, CheckCircle2, Heart, Baby, Pill } from "lucide-react";
 
 interface ProcessLogProps {
     processState: ProcessState;
@@ -9,6 +9,15 @@ interface ProcessLogProps {
 }
 
 type StepStatus = "pending" | "active" | "complete" | "skipped";
+
+// map icon names to components
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+    Stethoscope,
+    Scale,
+    Heart,
+    Baby,
+    Pill,
+};
 
 export function ProcessLog({ processState, isLoading }: ProcessLogProps) {
     // don't show if nothing has started
@@ -35,6 +44,9 @@ export function ProcessLog({ processState, isLoading }: ProcessLogProps) {
             <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
         );
     };
+
+    // get active auditors from process state
+    const activeAuditors = processState.activeAuditors || [];
 
     return (
         <div className="bg-muted/50 rounded-lg p-4 border border-border/50">
@@ -69,39 +81,50 @@ export function ProcessLog({ processState, isLoading }: ProcessLogProps) {
                     </div>
                 </div>
 
-                {/* Medical Audit Step */}
-                <div className={`flex items-start gap-3 ${processState.medical_check === "pending" ? "opacity-40" : ""}`}>
-                    {getStatusIcon(processState.medical_check)}
-                    <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                            <Stethoscope className="h-4 w-4 text-rose-400" />
-                            <span className="text-sm font-medium">Medical Auditor</span>
-                            {processState.medical_check === "complete" && getAuditResultIcon(processState.medicalResult?.safe)}
-                        </div>
-                        {processState.medicalResult && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                                {processState.medicalResult.reasoning}
-                            </p>
-                        )}
-                    </div>
-                </div>
+                {/* Dynamic Auditor Steps */}
+                {activeAuditors.map((auditorId) => {
+                    const auditorInfo = AUDITOR_UI_INFO[auditorId];
+                    const state = processState.auditorStates[auditorId] || "pending";
+                    const result = processState.auditorResults[auditorId];
+                    const IconComponent = auditorInfo ? iconMap[auditorInfo.icon] : Stethoscope;
 
-                {/* Legal Audit Step */}
-                <div className={`flex items-start gap-3 ${processState.legal_check === "pending" ? "opacity-40" : ""}`}>
-                    {getStatusIcon(processState.legal_check)}
-                    <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                            <Scale className="h-4 w-4 text-purple-400" />
-                            <span className="text-sm font-medium">Legal Auditor</span>
-                            {processState.legal_check === "complete" && getAuditResultIcon(processState.legalResult?.safe)}
+                    return (
+                        <div
+                            key={auditorId}
+                            className={`flex items-start gap-3 transition-all duration-300 ${state === "pending" ? "opacity-40" : ""}`}
+                        >
+                            {getStatusIcon(state)}
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                    {IconComponent && (
+                                        <IconComponent className={`h-4 w-4 ${auditorInfo?.color || "text-muted-foreground"}`} />
+                                    )}
+                                    <span className="text-sm font-medium">
+                                        {auditorInfo?.name || auditorId}
+                                    </span>
+                                    {state === "complete" && getAuditResultIcon(result?.safe)}
+                                </div>
+                                {result && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {result.reasoning}
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                        {processState.legalResult && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                                {processState.legalResult.reasoning}
-                            </p>
-                        )}
+                    );
+                })}
+
+                {/* Show placeholder when auditors haven't been determined yet */}
+                {activeAuditors.length === 0 && processState.drafting === "complete" && (
+                    <div className="flex items-start gap-3 opacity-40">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                        <div className="flex-1">
+                            <span className="text-sm font-medium text-muted-foreground">
+                                Determining required auditors...
+                            </span>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Correction Step - only show if needed */}
                 {processState.correcting !== "pending" && processState.correcting !== "skipped" && (

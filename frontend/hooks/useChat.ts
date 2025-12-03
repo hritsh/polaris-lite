@@ -6,10 +6,11 @@ import { sendMessageStream } from "@/lib/api";
 
 const initialProcessState: ProcessState = {
     drafting: "pending",
-    medical_check: "pending",
-    legal_check: "pending",
     correcting: "pending",
     finalizing: "pending",
+    activeAuditors: [],
+    auditorStates: {},
+    auditorResults: {},
 };
 
 const STORAGE_KEY = "constellation_chat_history";
@@ -82,23 +83,19 @@ export function useChat() {
                     } else if (event.status === "complete") {
                         next.drafting = "complete";
                         next.draft = event.draft;
-                        // start auditing
-                        next.medical_check = "active";
-                        next.legal_check = "active";
                     }
                     break;
 
-                case "medical_check":
-                    if (event.status === "complete") {
-                        next.medical_check = "complete";
-                        next.medicalResult = event.result as AuditResult;
-                    }
-                    break;
-
-                case "legal_check":
-                    if (event.status === "complete") {
-                        next.legal_check = "complete";
-                        next.legalResult = event.result as AuditResult;
+                case "auditing":
+                    // received list of active auditors
+                    if (event.status === "started" && event.active_auditors) {
+                        next.activeAuditors = event.active_auditors;
+                        // initialize all auditor states as pending
+                        const states: Record<string, "pending" | "active" | "complete"> = {};
+                        for (const auditorId of event.active_auditors) {
+                            states[auditorId] = "pending";
+                        }
+                        next.auditorStates = states;
                     }
                     break;
 
@@ -122,6 +119,30 @@ export function useChat() {
 
                 case "complete":
                     next.finalizing = "complete";
+                    break;
+
+                default:
+                    // handle dynamic auditor events (e.g., "medical_check", "empathy_check")
+                    if (event.step.endsWith("_check") && event.auditor_id) {
+                        const auditorId = event.auditor_id;
+                        if (event.status === "started") {
+                            next.auditorStates = {
+                                ...next.auditorStates,
+                                [auditorId]: "active",
+                            };
+                        } else if (event.status === "complete") {
+                            next.auditorStates = {
+                                ...next.auditorStates,
+                                [auditorId]: "complete",
+                            };
+                            if (event.result) {
+                                next.auditorResults = {
+                                    ...next.auditorResults,
+                                    [auditorId]: event.result as AuditResult,
+                                };
+                            }
+                        }
+                    }
                     break;
             }
 

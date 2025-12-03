@@ -20,18 +20,18 @@ interface HeaderProps {
 }
 
 export function Header({ hitlMode, onHitlChange }: HeaderProps) {
-    const [darkMode, setDarkMode] = useState(true);
-    const [backendStatus, setBackendStatus] = useState<"connecting" | "online" | "offline">("connecting");
-
-    useEffect(() => {
-        // check for saved preference or system preference
-        const saved = localStorage.getItem("theme");
-        if (saved) {
-            setDarkMode(saved === "dark");
-        } else {
-            setDarkMode(window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const [darkMode, setDarkMode] = useState(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("theme");
+            if (saved) {
+                return saved === "dark";
+            } else {
+                return window.matchMedia("(prefers-color-scheme: dark)").matches;
+            }
         }
-    }, []);
+        return true;
+    });
+    const [backendStatus, setBackendStatus] = useState<"connecting" | "online" | "offline">("connecting");
 
     useEffect(() => {
         if (darkMode) {

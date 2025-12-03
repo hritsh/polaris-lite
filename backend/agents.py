@@ -4,13 +4,18 @@ import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 from config import GEMINI_API_KEY, MODEL_NAME
-from prompts import PRIMARY_NURSE_PROMPT, MEDICAL_AUDITOR_PROMPT, LEGAL_AUDITOR_PROMPT, CORRECTION_PROMPT
+from prompts import (
+    PRIMARY_NURSE_PROMPT,
+    CORRECTION_PROMPT,
+    AUDITOR_CONFIG,
+    get_active_auditors
+)
 
 # configure gemini
 genai.configure(api_key=GEMINI_API_KEY)
 
 # thread pool for running sync gemini calls async
-executor = ThreadPoolExecutor(max_workers=3)
+executor = ThreadPoolExecutor(max_workers=5)
 
 
 def _call_gemini(prompt: str, system_instruction: str = None) -> str:
@@ -66,21 +71,18 @@ async def get_nurse_draft(query: str, history: list = None) -> str:
     return await call_gemini_async(prompt, PRIMARY_NURSE_PROMPT)
 
 
-async def run_medical_audit(draft: str, query: str) -> dict:
-    """run medical safety check, returns parsed dict"""
-    prompt = MEDICAL_AUDITOR_PROMPT.format(draft=draft, query=query)
+async def run_auditor(auditor_id: str, draft: str, query: str) -> dict:
+    """run a specific auditor, returns parsed dict with auditor_id"""
+    config = AUDITOR_CONFIG[auditor_id]
+    prompt = config["prompt"].format(draft=draft, query=query)
     response = await call_gemini_async(prompt)
-    return parse_audit_response(response)
+    result = parse_audit_response(response)
+    result["auditor_id"] = auditor_id
+    result["auditor_name"] = config["name"]
+    return result
 
 
-async def run_legal_audit(draft: str, query: str) -> dict:
-    """run legal/compliance check, returns parsed dict"""
-    prompt = LEGAL_AUDITOR_PROMPT.format(draft=draft, query=query)
-    response = await call_gemini_async(prompt)
-    return parse_audit_response(response)
-
-
-async def get_corrected_response(draft: str, medical_feedback: str, legal_feedback: str, query: str, history: list = None) -> str:
+async def get_corrected_response(draft: str, audit_results: dict, query: str, history: list = None) -> str:
     """ask nurse to fix the draft based on auditor feedback"""
     context = ""
     if history and len(history) > 0:
@@ -90,12 +92,35 @@ async def get_corrected_response(draft: str, medical_feedback: str, legal_feedba
         ])
         context = f"Previous conversation:\n{history_text}\n\n"
 
+    # build feedback section from all auditor results
+    feedback_lines = []
+    for auditor_id, result in audit_results.items():
+        name = AUDITOR_CONFIG[auditor_id]["name"].upper()
+        feedback = result.get("reasoning", "")
+        if result.get("suggestion"):
+            feedback += f" Suggestion: {result.get('suggestion')}"
+        if result.get("status") == "SAFE":
+            feedback = f"(Approved but with suggestion) {feedback}"
+        feedback_lines.append(f"{name}: {feedback}")
+
+    feedback_section = "\n".join(feedback_lines)
+
     prompt = CORRECTION_PROMPT.format(
         query=query,
         draft=draft,
-        medical_feedback=medical_feedback,
-        legal_feedback=legal_feedback
+        feedback_section=feedback_section
     )
     if context:
         prompt = context + prompt
     return await call_gemini_async(prompt, PRIMARY_NURSE_PROMPT)
+
+
+# Keep these for backwards compatibility but mark as deprecated
+async def run_medical_audit(draft: str, query: str) -> dict:
+    """DEPRECATED: use run_auditor('medical', ...) instead"""
+    return await run_auditor("medical", draft, query)
+
+
+async def run_legal_audit(draft: str, query: str) -> dict:
+    """DEPRECATED: use run_auditor('legal', ...) instead"""
+    return await run_auditor("legal", draft, query)

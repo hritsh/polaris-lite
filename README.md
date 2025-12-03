@@ -16,8 +16,10 @@ hosted and running on [vercel](https://polaris-lite.vercel.app/)
 
 ## feature overview
 
-- multi-agent constellation architecture based on [hippocratic ai's polaris](https://hippocraticai.com/polaris-3/) with nurse agent, medical auditor, and legal auditor
-- real-time streaming of the reasoning chain as each agent processes the request
+- multi-agent constellation architecture based on [hippocratic ai's polaris](https://hippocraticai.com/polaris-3/) with dynamic auditor selection
+- **5 specialized auditors**: medical, legal, empathy (always run), plus pediatric and drug interaction (conditional)
+- **dynamic agent activation**: auditor list changes based on prompt content - watching them appear is a "wow" moment
+- real-time streaming of the reasoning chain as each agent processes sequentially
 - human-in-the-loop (hitl) mode for manual approval of safety corrections with edit capability
 - visual diff view showing exactly what was changed and why
 - chat history with local storage persistence
@@ -27,14 +29,17 @@ hosted and running on [vercel](https://polaris-lite.vercel.app/)
 
 the system uses a "constellation" of specialized ai agents that work together:
 
-| Agent                | Role                                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Nurse Agent**      | Drafts initial responses to health questions. Intentionally imperfect to demonstrate the safety system. |
-| **Medical Auditor**  | Reviews drafts for medical accuracy, dangerous dosage info, missing disclaimers, urgency issues.        |
-| **Legal Auditor**    | Reviews drafts for compliance issues, liability concerns, scope-of-practice violations.                 |
-| **Correction Agent** | If auditors flag issues, this agent rewrites the response incorporating their feedback.                 |
+| Agent                           | Role                                                                                                    | When it runs                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| **Nurse Agent**                 | Drafts initial responses to health questions. Intentionally imperfect to demonstrate the safety system. | Always                              |
+| **Medical Auditor** 🏥          | Reviews drafts for medical accuracy, dangerous dosage info, missing disclaimers, urgency issues.        | Always                              |
+| **Legal Auditor** ⚖️            | Reviews drafts for compliance issues, liability concerns, scope-of-practice violations.                 | Always                              |
+| **Empathy Auditor** 💜          | Checks if the response is warm, reassuring, and appropriate for anxious patients.                       | Always                              |
+| **Pediatric Auditor** 👶        | Specialized checks for child-specific safety (dosing, contraindications, age-appropriate care).         | When children/pregnancy mentioned   |
+| **Drug Interaction Auditor** 💊 | Checks for dangerous drug interactions when multiple medications are discussed.                         | When multiple medications mentioned |
+| **Correction Agent**            | If auditors flag issues, this agent rewrites the response incorporating their feedback.                 | When any auditor flags an issue     |
 
-the auditors run in parallel using `asyncio.gather` for faster processing, and results stream back to the frontend in real-time via server-sent events (sse).
+the auditors run **sequentially** (not in parallel) so you can watch each one process in real-time. conditional auditors are triggered by keyword detection in the user's message and conversation history.
 
 ## stuff used
 
@@ -50,10 +55,29 @@ the auditors run in parallel using `asyncio.gather` for faster processing, and r
 
 1. user asks a health-related question
 2. nurse agent drafts an initial response (intentionally may be imperfect)
-3. medical and legal auditors review the draft in parallel
-4. if issues are found, the correction agent rewrites the response
-5. user sees the full reasoning chain and final (safe) response
-6. in hitl mode, user can approve/reject/edit corrections before they're applied
+3. system detects which auditors should run based on keywords in the prompt
+4. auditors review the draft **sequentially** - you see each one process in real-time
+5. if issues are found, the correction agent rewrites the response
+6. user sees the full reasoning chain and final (safe) response
+7. in hitl mode, user can approve/reject/edit corrections before they're applied
+
+## dynamic auditor activation
+
+the system intelligently activates additional auditors based on your prompt:
+
+**pediatric auditor activates on keywords like:**
+
+- child, children, kid, baby, infant, toddler, newborn
+- son, daughter, pregnant, pregnancy, breastfeeding
+- "2 year old", "6 month old", teenager, adolescent
+
+**drug interaction auditor activates on keywords like:**
+
+- medication, medicine, drug, prescription, pill
+- specific drug names (ibuprofen, tylenol, aspirin, etc.)
+- mix, combine, together, interaction
+
+this means asking "what's a good headache remedy?" will run 3 auditors, but asking "what's the right tylenol dose for my 2 year old who's also on antibiotics?" will run all 5!
 
 ## limitations
 
@@ -64,23 +88,34 @@ actual future work could involve training specialized models for each agent, int
 ## screenshots
 
 1. chat interface with reasoning chain visible
-    <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/3cdfedc9-3cfe-407b-b4d1-ba37f4cb36cf" />
+   <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/3cdfedc9-3cfe-407b-b4d1-ba37f4cb36cf" />
 
-  
 2. safety correction in action - auditors flagging issues
-    <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/bdf787ab-0780-4fd3-b677-2a4c2219ea4f" />
+   <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/bdf787ab-0780-4fd3-b677-2a4c2219ea4f" />
 
 3. hitl mode - human approval with edit capability
-    <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/5268620d-254c-47a0-9590-1604740651fb" />
+   <img width="1512" height="950" alt="image" src="https://github.com/user-attachments/assets/5268620d-254c-47a0-9590-1604740651fb" />
 
 ## example prompts to try
 
-these prompts could be helpful to trigger the safety auditors and see the system in action:
+these prompts could be helpful to trigger different auditor combinations:
 
-- "What's the right Tylenol dose for my 2 year old?" - triggers dosage safety flags
-- "Can I take my husband's blood pressure medication?" - triggers prescription safety flags
-- "I've been having chest pains for 3 days, what should I do?" - triggers urgency flags
-- "Is it safe to mix ibuprofen and aspirin for pain?" - triggers drug interaction flags
+**3 auditors (medical, legal, empathy):**
+
+- "I have a headache, what should I take?"
+- "How do I know if I have a cold or the flu?"
+
+**4 auditors (+pediatric):**
+
+- "What's the right Tylenol dose for my 2 year old?" - triggers pediatric safety
+- "My daughter has a fever, when should I worry?" - triggers pediatric context
+- "Is it safe to breastfeed while taking ibuprofen?" - triggers pregnancy/nursing check
+
+**5 auditors (+drug interaction):**
+
+- "Can I take ibuprofen and aspirin together for pain?" - triggers drug interaction
+- "My child is on antibiotics, can I give her children's Motrin too?" - triggers BOTH pediatric AND drug interaction
+- "I'm taking blood pressure medication, is it safe to take Advil?" - triggers drug interaction
 
 ## setup instructions
 
@@ -135,6 +170,7 @@ these prompts could be helpful to trigger the safety auditors and see the system
 │  Next.js + React + shadcn/ui + Tailwind                     │
 │  - Chat interface with message history                      │
 │  - Real-time process log via SSE                            │
+│  - Dynamic auditor list based on prompt                     │
 │  - HITL approval panel with edit capability                 │
 │  - Diff view for corrections                                │
 └─────────────────────────────────────────────────────────────┘
@@ -145,25 +181,35 @@ these prompts could be helpful to trigger the safety auditors and see the system
 │                        Backend                              │
 │  Flask + Gunicorn                                           │
 │  /chat/stream - SSE endpoint                                │
+│  Dynamic auditor selection based on keywords                │
 └─────────────────────────────────────────────────────────────┘
                               │
             ┌─────────────────┼─────────────────┐
-            ▼                 ▼                 ▼
-    ┌───────────┐     ┌───────────┐     ┌───────────┐
-    │   Nurse   │     │  Medical  │     │   Legal   │
-    │   Agent   │────▶│  Auditor  │     │  Auditor  │
-    │           │     │           │     │           │
-    └───────────┘     └─────┬─────┘     └─────┬─────┘
-                            │                 │
-                            │   parallel      │
-                            ▼                 ▼
-                      ┌───────────────────────────┐
-                      │    Correction Agent       │
-                      │  (if issues flagged)      │
-                      └───────────────────────────┘
-                                    │
-                                    ▼
-                              Gemini API
+            ▼                 │                 │
+    ┌───────────┐             │                 │
+    │   Nurse   │             │                 │
+    │   Agent   │─────────────┘                 │
+    │           │                               │
+    └───────────┘                               │
+            │                                   │
+            ▼ Sequential Auditing               │
+    ┌─────────────────────────────────────┐     │
+    │  Always Run:                        │     │
+    │  🏥 Medical → ⚖️ Legal → 💜 Empathy  │     │
+    ├─────────────────────────────────────┤     │
+    │  Conditional:                       │     │
+    │  👶 Pediatric (if child mentioned)  │     │
+    │  💊 Drug (if meds mentioned)        │     │
+    └─────────────────────────────────────┘     │
+                        │                       │
+                        ▼                       │
+                ┌───────────────────────────┐   │
+                │    Correction Agent       │   │
+                │  (if issues flagged)      │───┘
+                └───────────────────────────┘
+                            │
+                            ▼
+                      Gemini API
 ```
 
 ## license

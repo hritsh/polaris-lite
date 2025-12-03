@@ -7,7 +7,7 @@ import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { ProcessLog } from "@/components/ProcessLog";
 import { HitlApproval } from "@/components/HitlApproval";
-import { Bot, MessageCircle, AlertTriangle, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Bot, MessageCircle, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 
@@ -113,7 +113,7 @@ export function Chat() {
                                 <div className="space-y-3 w-full max-w-md">
                                     <p className="text-xs text-muted-foreground">Try these examples:</p>
                                     <div className="flex flex-col gap-2">
-                                        {EXAMPLE_QUERIES.map((suggestion, idx) => (
+                                        {EXAMPLE_QUERIES.map((suggestion) => (
                                             <button
                                                 key={suggestion}
                                                 onClick={() => send(suggestion)}
@@ -161,7 +161,7 @@ export function Chat() {
                         <ChatInput onSend={send} disabled={isLoading || !!pendingResponse} />
                         <p className="text-xs text-muted-foreground text-center mt-2 hidden sm:block">
                             <MessageCircle className="h-3 w-3 inline mr-1" />
-                            Responses verified by Medical & Legal auditors
+                            Responses verified by Medical & Legal auditor agents
                         </p>
                     </div>
                 </div>
