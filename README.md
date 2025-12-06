@@ -16,7 +16,7 @@ hosted and running on [vercel](https://polaris-lite.vercel.app/)
 
 ## feature overview
 
-- multi-agent constellation architecture based on [hippocratic ai's polaris](https://hippocraticai.com/polaris-3/) with dynamic auditor selection
+- multi-agent constellation architecture based on [polaris](https://hippocraticai.com/polaris-3/) with dynamic auditor selection
 - **5 specialized auditors**: medical, legal, empathy (always run), plus pediatric and drug interaction (if keywords detected)
 - real-time streaming of the reasoning chain as each agent processes in sequence/parallel
 - human-in-the-loop (hitl) mode for manual approval of safety corrections with edit capability
