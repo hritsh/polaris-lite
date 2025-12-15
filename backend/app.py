@@ -2,13 +2,35 @@ from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import asyncio
 import json
+import tempfile
+import os
 from config import FRONTEND_URL
+
+# Fast original agents (default)
 from agents import (
-    get_nurse_draft,
-    run_auditor,
-    get_corrected_response
+    get_nurse_draft as get_nurse_draft_fast,
+    run_auditor as run_auditor_fast,
+    get_corrected_response as get_corrected_response_fast
 )
+
+# LangChain agents with RAG support (optional, slower)
+from langchain_agents import (
+    get_nurse_draft_langchain,
+    run_auditor_langchain,
+    get_corrected_response_langchain
+)
+
 from prompts import get_active_auditors, AUDITOR_CONFIG
+from rag import (
+    add_pdf_document,
+    add_document,
+    list_documents,
+    delete_document,
+    clear_all_documents,
+    get_rag_stats,
+    is_rag_enabled,
+    set_rag_enabled
+)
 
 app = Flask(__name__)
 
@@ -25,7 +47,90 @@ CORS(
 @app.route("/health", methods=["GET"])
 def health():
     """health check endpoint for render"""
-    return jsonify({"status": "ok", "message": "constellation is running"})
+    rag_info = get_rag_stats()
+    return jsonify({
+        "status": "ok", 
+        "message": "constellation is running",
+        "features": {
+            "langchain": True,
+            "rag_available": True,
+            "rag_enabled": is_rag_enabled(),
+            "documents_loaded": rag_info["total_documents"]
+        }
+    })
+
+
+# ========== RAG Document Upload Endpoints ==========
+
+@app.route("/documents/upload", methods=["POST"])
+def upload_document():
+    """
+    Upload a PDF document for RAG.
+    Supports file upload or raw text.
+    """
+    # Check if file upload
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({"error": "Only PDF files are supported"}), 400
+        
+        # Save to temp file and process
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                file.save(tmp.name)
+                result = add_pdf_document(tmp.name, file.filename)
+                os.unlink(tmp.name)  # Clean up
+            
+            return jsonify(result), 200 if result["success"] else 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    # Check if raw text
+    data = request.get_json()
+    if data and "text" in data:
+        filename = data.get("filename", "text_document.txt")
+        result = add_document(data["text"], filename, doc_type="text")
+        return jsonify(result), 200 if result["success"] else 400
+    
+    return jsonify({"error": "No file or text provided"}), 400
+
+
+@app.route("/documents", methods=["GET"])
+def get_documents():
+    """List all uploaded documents"""
+    return jsonify(get_rag_stats())
+
+
+@app.route("/documents/<doc_id>", methods=["DELETE"])
+def remove_document(doc_id):
+    """Delete a specific document"""
+    result = delete_document(doc_id)
+    return jsonify(result), 200 if result["success"] else 404
+
+
+@app.route("/documents/clear", methods=["POST"])
+def clear_documents():
+    """Clear all uploaded documents"""
+    result = clear_all_documents()
+    return jsonify(result)
+
+
+@app.route("/rag/toggle", methods=["POST"])
+def toggle_rag():
+    """Toggle RAG mode on/off"""
+    data = request.get_json()
+    enabled = data.get("enabled", False) if data else False
+    set_rag_enabled(enabled)
+    return jsonify({"rag_enabled": is_rag_enabled()})
+
+
+@app.route("/rag/status", methods=["GET"])
+def rag_status():
+    """Get current RAG status"""
+    return jsonify({"rag_enabled": is_rag_enabled()})
 
 
 @app.route("/chat", methods=["POST"])
@@ -46,6 +151,25 @@ def chat():
     result = asyncio.run(run_constellation(query, history))
 
     return jsonify(result)
+
+
+# Select agents based on RAG mode
+def get_nurse_draft(query, history):
+    if is_rag_enabled():
+        return get_nurse_draft_langchain(query, history)
+    return get_nurse_draft_fast(query, history)
+
+
+def run_auditor(auditor_id, draft, query):
+    if is_rag_enabled():
+        return run_auditor_langchain(auditor_id, draft, query)
+    return run_auditor_fast(auditor_id, draft, query)
+
+
+def get_corrected_response(draft, audit_results, query, history):
+    if is_rag_enabled():
+        return get_corrected_response_langchain(draft, audit_results, query, history)
+    return get_corrected_response_fast(draft, audit_results, query, history)
 
 
 @app.route("/chat/stream", methods=["POST"])

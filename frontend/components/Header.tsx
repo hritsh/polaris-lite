@@ -9,17 +9,19 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Shield, Github, Moon, Sun, Loader2 } from "lucide-react";
+import { Shield, Github, Moon, Sun, Loader2, BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { checkHealth } from "@/lib/api";
+import { checkHealth, API_URL } from "@/lib/api";
 
 interface HeaderProps {
     hitlMode: boolean;
     onHitlChange: (value: boolean) => void;
+    ragMode?: boolean;
+    onRagChange?: (value: boolean) => void;
 }
 
-export function Header({ hitlMode, onHitlChange }: HeaderProps) {
+export function Header({ hitlMode, onHitlChange, ragMode = false, onRagChange }: HeaderProps) {
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== "undefined") {
             const saved = localStorage.getItem("theme");
@@ -126,6 +128,27 @@ export function Header({ hitlMode, onHitlChange }: HeaderProps) {
                         <Badge variant="secondary" className="text-xs hidden md:flex">
                             Manual Approval
                         </Badge>
+                    )}
+
+                    {/* RAG Toggle */}
+                    {onRagChange && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-2">
+                                        <BookOpen className={`h-4 w-4 ${ragMode ? 'text-blue-500' : 'text-muted-foreground'} hidden sm:block`} />
+                                        <span className="text-sm text-muted-foreground hidden sm:inline">RAG</span>
+                                        <Switch
+                                            checked={ragMode}
+                                            onCheckedChange={onRagChange}
+                                        />
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    <p>{ragMode ? "RAG enabled (slower, uses knowledge base)" : "RAG disabled (faster responses)"}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     )}
 
                     <div className="flex items-center gap-1">

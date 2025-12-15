@@ -9,7 +9,8 @@ import { ProcessLog } from "@/components/ProcessLog";
 import { HitlApproval } from "@/components/HitlApproval";
 import { Bot, MessageCircle, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { API_URL } from "@/lib/api";
 
 // example queries that will trigger safety corrections
 const EXAMPLE_QUERIES = [
@@ -39,6 +40,23 @@ export function Chat() {
 
     // responsive: default sidebar closed on mobile
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    
+    // RAG mode toggle
+    const [ragMode, setRagMode] = useState(false);
+    
+    // Toggle RAG on backend
+    const handleRagChange = useCallback(async (enabled: boolean) => {
+        try {
+            await fetch(`${API_URL}/rag/toggle`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled }),
+            });
+            setRagMode(enabled);
+        } catch (error) {
+            console.error("Failed to toggle RAG:", error);
+        }
+    }, []);
 
     useEffect(() => {
         // check if we're on desktop
@@ -59,7 +77,7 @@ export function Chat() {
     };
 
     return (
-        <div className="flex h-screen bg-background overflow-hidden">
+        <div className="fixed inset-0 flex bg-background">
             {/* Sidebar - overlay on mobile */}
             {sidebarOpen && (
                 <>
@@ -80,8 +98,13 @@ export function Chat() {
                 </>
             )}
 
-            <div className="flex flex-col flex-1 min-w-0">
-                <Header hitlMode={hitlMode} onHitlChange={setHitlMode} />
+            <div className="flex flex-col flex-1 min-w-0 h-full">
+                <Header 
+                    hitlMode={hitlMode} 
+                    onHitlChange={setHitlMode} 
+                    ragMode={ragMode}
+                    onRagChange={handleRagChange}
+                />
 
                 {/* Toggle sidebar button */}
                 <Button
@@ -97,7 +120,7 @@ export function Chat() {
                     )}
                 </Button>
 
-                <main className="flex-1 overflow-y-auto">
+                <main className="flex-1 overflow-y-auto min-h-0">
                     <div className="max-w-4xl mx-auto px-3 py-4 md:px-4 md:py-6">
                         {messages.length === 0 ? (
                             // Empty state
@@ -156,7 +179,7 @@ export function Chat() {
                 </main>
 
                 {/* Input area - fixed at bottom */}
-                <div className="sticky bottom-0 border-t border-border/50 p-3 md:p-4 bg-background/95 backdrop-blur-sm">
+                <div className="shrink-0 border-t border-border/50 p-3 md:p-4 bg-background/95 backdrop-blur-sm">
                     <div className="max-w-4xl mx-auto">
                         <ChatInput onSend={send} disabled={isLoading || !!pendingResponse} />
                         <p className="text-xs text-muted-foreground text-center mt-2 hidden sm:block">

@@ -1,8 +1,10 @@
 "use client";
 
 import { ChatSession } from "@/lib/types";
+import { API_URL } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DocumentUpload } from "@/components/DocumentUpload";
 import { MessageSquarePlus, Trash2, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +46,9 @@ export function Sidebar({
                     New Chat
                 </Button>
             </div>
+
+            {/* RAG Document Upload */}
+            <DocumentUpload backendUrl={API_URL} />
 
             <ScrollArea className="flex-1">
                 <div className="p-2 space-y-1">
