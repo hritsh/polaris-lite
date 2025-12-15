@@ -3,11 +3,11 @@
 import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { 
-    FileText, 
-    Upload, 
-    X, 
-    Trash2, 
+import {
+    FileText,
+    Upload,
+    X,
+    Trash2,
     FileUp,
     Loader2,
     CheckCircle,
@@ -71,15 +71,15 @@ export function DocumentUpload({ backendUrl }: DocumentUploadProps) {
             const data = await res.json();
 
             if (res.ok && data.success) {
-                setUploadStatus({ 
-                    type: "success", 
-                    message: `Uploaded "${data.filename}" (${data.chunks} chunks)` 
+                setUploadStatus({
+                    type: "success",
+                    message: `Uploaded "${data.filename}" (${data.chunks} chunks)`
                 });
                 fetchDocuments();
             } else {
-                setUploadStatus({ 
-                    type: "error", 
-                    message: data.error || data.message || "Upload failed" 
+                setUploadStatus({
+                    type: "error",
+                    message: data.error || data.message || "Upload failed"
                 });
             }
         } catch (error) {
@@ -95,7 +95,7 @@ export function DocumentUpload({ backendUrl }: DocumentUploadProps) {
             const res = await fetch(`${backendUrl}/documents/${docId}`, {
                 method: "DELETE",
             });
-            
+
             if (res.ok) {
                 fetchDocuments();
                 setUploadStatus({ type: "success", message: "Document deleted" });
@@ -111,7 +111,7 @@ export function DocumentUpload({ backendUrl }: DocumentUploadProps) {
             const res = await fetch(`${backendUrl}/documents/clear`, {
                 method: "POST",
             });
-            
+
             if (res.ok) {
                 setDocuments([]);
                 setUploadStatus({ type: "success", message: "All documents cleared" });
@@ -186,7 +186,7 @@ export function DocumentUpload({ backendUrl }: DocumentUploadProps) {
                                 e.target.value = "";
                             }}
                         />
-                        
+
                         {isUploading ? (
                             <div className="flex flex-col items-center gap-2">
                                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -207,11 +207,10 @@ export function DocumentUpload({ backendUrl }: DocumentUploadProps) {
                     {/* Status message */}
                     {uploadStatus && (
                         <div
-                            className={`flex items-center gap-2 text-sm p-2 rounded ${
-                                uploadStatus.type === "success"
+                            className={`flex items-center gap-2 text-sm p-2 rounded ${uploadStatus.type === "success"
                                     ? "bg-green-500/10 text-green-600"
                                     : "bg-red-500/10 text-red-600"
-                            }`}
+                                }`}
                         >
                             {uploadStatus.type === "success" ? (
                                 <CheckCircle className="h-4 w-4" />
@@ -219,7 +218,7 @@ export function DocumentUpload({ backendUrl }: DocumentUploadProps) {
                                 <AlertCircle className="h-4 w-4" />
                             )}
                             <span className="flex-1">{uploadStatus.message}</span>
-                            <button 
+                            <button
                                 onClick={() => setUploadStatus(null)}
                                 className="hover:opacity-70"
                             >
@@ -249,7 +248,7 @@ export function DocumentUpload({ backendUrl }: DocumentUploadProps) {
                                     ))}
                                 </div>
                             )}
-                            
+
                             {/* User uploaded documents */}
                             {documents.filter(d => !d.is_builtin).length > 0 && (
                                 <div className="space-y-1">
@@ -274,7 +273,7 @@ export function DocumentUpload({ backendUrl }: DocumentUploadProps) {
                                     ))}
                                 </div>
                             )}
-                            
+
                             {documents.filter(d => !d.is_builtin).length > 0 && (
                                 <Button
                                     variant="ghost"

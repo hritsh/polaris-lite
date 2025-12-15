@@ -1,3 +1,14 @@
+from prompts import get_active_auditors, AUDITOR_CONFIG
+from rag import (
+    add_pdf_document,
+    add_document,
+    list_documents,
+    delete_document,
+    clear_all_documents,
+    get_rag_stats,
+    is_rag_enabled,
+    set_rag_enabled
+)
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import asyncio
@@ -14,23 +25,25 @@ from agents import (
 )
 
 # LangChain agents with RAG support (optional, slower)
-from langchain_agents import (
-    get_nurse_draft_langchain,
-    run_auditor_langchain,
-    get_corrected_response_langchain
-)
+# Lazily imported when RAG is enabled to keep startup fast.
+_langchain_funcs = None
 
-from prompts import get_active_auditors, AUDITOR_CONFIG
-from rag import (
-    add_pdf_document,
-    add_document,
-    list_documents,
-    delete_document,
-    clear_all_documents,
-    get_rag_stats,
-    is_rag_enabled,
-    set_rag_enabled
-)
+
+def _get_langchain_funcs():
+    global _langchain_funcs
+    if _langchain_funcs is None:
+        from langchain_agents import (
+            get_nurse_draft_langchain,
+            run_auditor_langchain,
+            get_corrected_response_langchain,
+        )
+        _langchain_funcs = (
+            get_nurse_draft_langchain,
+            run_auditor_langchain,
+            get_corrected_response_langchain,
+        )
+    return _langchain_funcs
+
 
 app = Flask(__name__)
 
@@ -49,7 +62,7 @@ def health():
     """health check endpoint for render"""
     rag_info = get_rag_stats()
     return jsonify({
-        "status": "ok", 
+        "status": "ok",
         "message": "constellation is running",
         "features": {
             "langchain": True,
@@ -73,28 +86,28 @@ def upload_document():
         file = request.files['file']
         if file.filename == '':
             return jsonify({"error": "No file selected"}), 400
-        
+
         if not file.filename.lower().endswith('.pdf'):
             return jsonify({"error": "Only PDF files are supported"}), 400
-        
+
         # Save to temp file and process
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
                 file.save(tmp.name)
                 result = add_pdf_document(tmp.name, file.filename)
                 os.unlink(tmp.name)  # Clean up
-            
+
             return jsonify(result), 200 if result["success"] else 400
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-    
+
     # Check if raw text
     data = request.get_json()
     if data and "text" in data:
         filename = data.get("filename", "text_document.txt")
         result = add_document(data["text"], filename, doc_type="text")
         return jsonify(result), 200 if result["success"] else 400
-    
+
     return jsonify({"error": "No file or text provided"}), 400
 
 
@@ -156,18 +169,21 @@ def chat():
 # Select agents based on RAG mode
 def get_nurse_draft(query, history):
     if is_rag_enabled():
+        get_nurse_draft_langchain, _, _ = _get_langchain_funcs()
         return get_nurse_draft_langchain(query, history)
     return get_nurse_draft_fast(query, history)
 
 
 def run_auditor(auditor_id, draft, query):
     if is_rag_enabled():
+        _, run_auditor_langchain, _ = _get_langchain_funcs()
         return run_auditor_langchain(auditor_id, draft, query)
     return run_auditor_fast(auditor_id, draft, query)
 
 
 def get_corrected_response(draft, audit_results, query, history):
     if is_rag_enabled():
+        _, _, get_corrected_response_langchain = _get_langchain_funcs()
         return get_corrected_response_langchain(draft, audit_results, query, history)
     return get_corrected_response_fast(draft, audit_results, query, history)
 

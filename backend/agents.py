@@ -2,6 +2,7 @@ import google.generativeai as genai
 import asyncio
 import json
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from config import GEMINI_API_KEY, MODEL_NAME
 from prompts import (
@@ -17,13 +18,30 @@ genai.configure(api_key=GEMINI_API_KEY)
 # thread pool for running sync gemini calls async
 executor = ThreadPoolExecutor(max_workers=5)
 
+_thread_local = threading.local()
+
+
+def _get_model(system_instruction: str | None):
+    """Cache GenerativeModel per thread + system_instruction to reduce overhead."""
+    cache = getattr(_thread_local, "models", None)
+    if cache is None:
+        cache = {}
+        _thread_local.models = cache
+
+    key = system_instruction or "__none__"
+    model = cache.get(key)
+    if model is None:
+        model = genai.GenerativeModel(
+            MODEL_NAME,
+            system_instruction=system_instruction,
+        )
+        cache[key] = model
+    return model
+
 
 def _call_gemini(prompt: str, system_instruction: str = None) -> str:
     """sync wrapper for gemini api call"""
-    model = genai.GenerativeModel(
-        MODEL_NAME,
-        system_instruction=system_instruction
-    )
+    model = _get_model(system_instruction)
     response = model.generate_content(prompt)
     return response.text
 

@@ -108,6 +108,7 @@ you can enhance the nurse agent's responses by uploading medical reference docum
 5. you can see which documents are loaded and remove them anytime
 
 this is useful for:
+
 - adding specific medical guidelines (dosage charts, drug interaction tables)
 - including institutional protocols or policies
 - referencing research papers or clinical guidelines
@@ -259,15 +260,15 @@ these prompts could be helpful to trigger different auditor combinations:
 
 ## api endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check with feature status |
-| `/chat` | POST | Non-streaming chat endpoint |
-| `/chat/stream` | POST | SSE streaming chat endpoint |
-| `/documents/upload` | POST | Upload PDF for RAG |
-| `/documents` | GET | List uploaded documents |
-| `/documents/<doc_id>` | DELETE | Delete a document |
-| `/documents/clear` | POST | Clear all documents |
+| Endpoint              | Method | Description                      |
+| --------------------- | ------ | -------------------------------- |
+| `/health`             | GET    | Health check with feature status |
+| `/chat`               | POST   | Non-streaming chat endpoint      |
+| `/chat/stream`        | POST   | SSE streaming chat endpoint      |
+| `/documents/upload`   | POST   | Upload PDF for RAG               |
+| `/documents`          | GET    | List uploaded documents          |
+| `/documents/<doc_id>` | DELETE | Delete a document                |
+| `/documents/clear`    | POST   | Clear all documents              |
 
 ## license
 

@@ -40,10 +40,10 @@ export function Chat() {
 
     // responsive: default sidebar closed on mobile
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    
+
     // RAG mode toggle
     const [ragMode, setRagMode] = useState(false);
-    
+
     // Toggle RAG on backend
     const handleRagChange = useCallback(async (enabled: boolean) => {
         try {
@@ -66,6 +66,21 @@ export function Chat() {
         checkWidth();
         window.addEventListener("resize", checkWidth);
         return () => window.removeEventListener("resize", checkWidth);
+    }, []);
+
+    // Sync initial RAG mode with backend (prevents UI/back-end mismatch after refresh)
+    useEffect(() => {
+        const syncRagStatus = async () => {
+            try {
+                const res = await fetch(`${API_URL}/rag/status`);
+                if (!res.ok) return;
+                const data = await res.json();
+                setRagMode(!!data?.rag_enabled);
+            } catch {
+                // ignore; backend may be sleeping/offline
+            }
+        };
+        syncRagStatus();
     }, []);
 
     // close sidebar when selecting a chat on mobile
@@ -99,9 +114,9 @@ export function Chat() {
             )}
 
             <div className="flex flex-col flex-1 min-w-0 h-full">
-                <Header 
-                    hitlMode={hitlMode} 
-                    onHitlChange={setHitlMode} 
+                <Header
+                    hitlMode={hitlMode}
+                    onHitlChange={setHitlMode}
                     ragMode={ragMode}
                     onRagChange={handleRagChange}
                 />
